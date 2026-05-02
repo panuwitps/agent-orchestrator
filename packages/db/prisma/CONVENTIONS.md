@@ -33,4 +33,6 @@ These conventions apply to every model added in Phase 2 onward.
 ## Cascade behavior
 - `User` deletion cascades to OAuth `Account`, `Session`. Other user-owned entities CASCADE on `ownerId` so a user delete cleans up their catalog.
 - `Project` deletion cascades to `Component`, `Ticket`, `Agent`, `Message`.
-- `Persona`/`Role` deletion does not cascade to junction tables — `onDelete: Restrict` so the user must un-attach first (prevents accidental data loss when a heavily-used role is deleted by mistake).
+- `Role` deletion cascades to its own attachment tables (`RoleSkill`, `RolePlugin`, `RoleMcp`) — those rows are role-specific config.
+- `Persona` deletion cascades to `PersonaRole` for the same reason.
+- `Skill`, `McpServer`, `Plugin` referenced from a junction use `onDelete: Restrict` so the catalog entity can't be deleted while attached — un-attach from the Role first. Same for `PersonaRole.role` (`Restrict` so a Role isn't silently removed from Personas that depend on it).

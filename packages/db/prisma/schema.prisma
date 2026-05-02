@@ -166,6 +166,7 @@ model Role {
 
   @@unique([ownerId, name])
   @@index([ownerId])
+  @@index([defaultProviderId])
   @@map("roles")
 }
 
@@ -258,6 +259,7 @@ model RolePlugin {
 
   @@id([roleId, pluginId])
   @@index([pluginId])
+  @@index([providerId])
   @@map("role_plugins")
 }
 
