@@ -20,8 +20,15 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  accounts Account[]
-  sessions Session[]
+  accounts           Account[]
+  sessions           Session[]
+  skills             Skill[]
+  roles              Role[]
+  personas           Persona[]
+  plugins            Plugin[]
+  mcpServers         McpServer[]
+  projects           Project[]
+  projectMemberships ProjectMembership[]
 
   @@map("users")
 }
@@ -89,4 +96,263 @@ model AuditLog {
 
   @@index([userId, createdAt])
   @@map("audit_logs")
+}
+
+// ----- Provider catalog (seeded) -----
+
+model Provider {
+  id              String   @id @default(cuid())
+  slug            String   @unique         // 'claude' | 'codex' | 'gemini'
+  name            String
+  cliCommand      String                  // 'claude' | 'codex' | 'gemini'
+  supportsSkills  Boolean  @default(false)
+  supportsPlugins Boolean  @default(false)
+  supportsMcp     Boolean  @default(true)
+  models          Json                    // [{id, name, effortLevels:[]}]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  defaultRoles  Role[]      @relation("RoleDefaultProvider")
+  plugins       Plugin[]
+  rolePlugins   RolePlugin[]
+
+  @@map("providers")
+}
+
+// ----- Skills -----
+
+model Skill {
+  id                   String   @id @default(cuid())
+  name                 String
+  description          String
+  frontmatter          Json     @default("{}")
+  content              String
+  compatibleProviders  String[]                       // e.g. ['claude','codex','gemini']
+  ownerId              String
+  isWorkspaceShared    Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  roles RoleSkill[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId])
+  @@map("skills")
+}
+
+// ----- Roles -----
+
+model Role {
+  id                String   @id @default(cuid())
+  name              String
+  description       String
+  systemPrompt      String
+  defaultProviderId String?
+  defaultModel      String?
+  defaultEffort     Effort   @default(HIGH)
+  toolPermissions   Json     @default("{\"read\":true,\"edit\":true,\"bash\":true,\"webFetch\":true}")
+  ownerId           String
+  isWorkspaceShared Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  owner           User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  defaultProvider Provider?   @relation("RoleDefaultProvider", fields: [defaultProviderId], references: [id])
+  skills          RoleSkill[]
+  plugins         RolePlugin[]
+  mcps            RoleMcp[]
+  personas        PersonaRole[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId])
+  @@map("roles")
+}
+
+enum Effort {
+  LOW
+  MEDIUM
+  HIGH
+  MAX
+}
+
+model RoleSkill {
+  roleId  String
+  skillId String
+
+  role  Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([roleId, skillId])
+  @@index([skillId])
+  @@map("role_skills")
+}
+
+// ----- Personas -----
+
+model Persona {
+  id                String   @id @default(cuid())
+  name              String
+  description       String
+  identityPrompt    String
+  avatarUrl         String?
+  ownerId           String
+  isWorkspaceShared Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  owner User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  roles PersonaRole[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId])
+  @@map("personas")
+}
+
+model PersonaRole {
+  personaId String
+  roleId    String
+  isDefault Boolean  @default(false)
+  order     Int      @default(0)
+
+  persona Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([personaId, roleId])
+  @@index([roleId])
+  @@map("persona_roles")
+}
+
+// ----- Plugins (Claude only) -----
+
+model Plugin {
+  id            String   @id @default(cuid())
+  source        String   // 'claude_marketplace' | 'manual_path'
+  name          String
+  version       String
+  config        Json     @default("{}")
+  installStatus String   @default("pending") // pending | installed | failed
+  providerId    String   // always claude in Phase 2
+  ownerId       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  owner    User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  provider Provider     @relation(fields: [providerId], references: [id])
+  roles    RolePlugin[]
+
+  @@unique([ownerId, providerId, name])
+  @@index([ownerId])
+  @@map("plugins")
+}
+
+model RolePlugin {
+  roleId     String
+  pluginId   String
+  providerId String
+  enabled    Boolean @default(true)
+
+  role     Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  plugin   Plugin   @relation(fields: [pluginId], references: [id], onDelete: Cascade)
+  provider Provider @relation(fields: [providerId], references: [id])
+
+  @@id([roleId, pluginId])
+  @@index([pluginId])
+  @@map("role_plugins")
+}
+
+// ----- MCP servers -----
+
+model McpServer {
+  id                  String   @id @default(cuid())
+  name                String
+  description         String
+  transport           String   // 'stdio' | 'http' | 'sse'
+  command             String?  // for stdio
+  args                String[] @default([])
+  url                 String?  // for http/sse
+  envEncrypted        Json     @default("{}")  // {KEY: EncryptedRecord}
+  compatibleProviders String[]
+  ownerId             String
+  isWorkspaceShared   Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  owner User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  roles RoleMcp[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId])
+  @@map("mcp_servers")
+}
+
+model RoleMcp {
+  roleId      String
+  mcpServerId String
+  enabled     Boolean @default(true)
+
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  mcpServer McpServer @relation(fields: [mcpServerId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, mcpServerId])
+  @@index([mcpServerId])
+  @@map("role_mcps")
+}
+
+// ----- Projects + Components -----
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  ownerId     String
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  components  Component[]
+  memberships ProjectMembership[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId])
+  @@map("projects")
+}
+
+model ProjectMembership {
+  projectId String
+  userId    String
+  role      ProjectRole @default(EDITOR)
+  createdAt DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+  @@map("project_memberships")
+}
+
+enum ProjectRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+model Component {
+  id            String   @id @default(cuid())
+  projectId     String
+  name          String
+  path          String                                    // absolute filesystem path
+  description   String
+  envEncrypted  Json     @default("{}")
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("components")
 }
