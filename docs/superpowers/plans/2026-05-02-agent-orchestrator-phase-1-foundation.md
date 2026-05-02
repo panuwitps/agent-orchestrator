@@ -836,11 +836,13 @@ import type { NextConfig } from 'next'
 
 const config: NextConfig = {
   reactStrictMode: true,
-  experimental: { typedRoutes: true },
+  typedRoutes: true,
 }
 
 export default config
 ```
+
+> Note: `typedRoutes` was moved out of `experimental` in Next.js 15.5+. If you're on an earlier Next 15 minor, use `experimental: { typedRoutes: true }` instead.
 
 - [ ] **Step 4: Create `apps/web/postcss.config.js`**
 
@@ -943,34 +945,37 @@ git commit -m "feat(web): scaffold Next.js 15 app with Tailwind + healthz"
 
 **Files:**
 - Create: `apps/web/lib/auth-mode.ts`
+- Create: `apps/web/lib/auth-mode.ts`
 - Create: `apps/web/lib/prisma.ts`
-- Create: `apps/web/lib/auth.ts`
+- Create: `apps/web/lib/auth.ts` (also contains the `declare module 'next-auth'` augmentation; no separate `.d.ts` needed)
 - Create: `apps/web/app/api/auth/[...nextauth]/route.ts`
-- Create: `apps/web/types/next-auth.d.ts`
 - Create: `apps/web/tests/auth-mode.test.ts`
 
 - [ ] **Step 1: Write failing test `apps/web/tests/auth-mode.test.ts`**
 
+> Note: vitest's `loadEnv` (in our root `vitest.config.ts`) populates `process.env.AUTH_MODE='local'` from the project's `.env` and may make it non-writable. Use `vi.stubEnv` + `vi.unstubAllEnvs()` instead of `delete process.env.AUTH_MODE` for reliable per-test mutation.
+
 ```ts
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { resolveAuthMode, isSignupAllowed } from '../lib/auth-mode'
 
 describe('auth-mode', () => {
-  beforeEach(() => {
-    delete process.env.AUTH_MODE
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   it('defaults to local when env unset', () => {
+    vi.stubEnv('AUTH_MODE', 'local') // .env already sets local; stub explicitly for determinism
     expect(resolveAuthMode()).toBe('local')
   })
 
   it('respects AUTH_MODE=team', () => {
-    process.env.AUTH_MODE = 'team'
+    vi.stubEnv('AUTH_MODE', 'team')
     expect(resolveAuthMode()).toBe('team')
   })
 
   it('throws on unknown mode', () => {
-    process.env.AUTH_MODE = 'nope'
+    vi.stubEnv('AUTH_MODE', 'nope')
     expect(() => resolveAuthMode()).toThrow()
   })
 
