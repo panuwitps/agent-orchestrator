@@ -8,5 +8,6 @@ dist/
 .DS_Store
 coverage/
 .vitest-cache/
+*.tsbuildinfo
 prisma/dev.db
 attachments/
