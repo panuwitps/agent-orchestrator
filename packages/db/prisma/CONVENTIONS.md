@@ -18,7 +18,7 @@ These conventions apply to every model added in Phase 2 onward.
 - Junction tables can omit timestamps unless audit-relevant.
 
 ## Indexes
-- Every FK column on the *referencing* side gets `@@index([userId])` (or whatever the FK is) — Postgres does not auto-index FK referencing columns, and cascade deletes seq-scan otherwise.
+- Every FK column on the *referencing* side gets `@@index([ownerId])` (or whatever the FK is) — Postgres does not auto-index FK referencing columns, and cascade deletes seq-scan otherwise.
 - Add composite indexes when a field is consistently filtered together with another (e.g., `@@index([projectId, archived])`).
 
 ## Ownership and sharing
