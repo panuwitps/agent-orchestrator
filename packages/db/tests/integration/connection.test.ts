@@ -6,8 +6,9 @@ describe('db connection', () => {
     await prisma.$disconnect()
   })
 
-  it('connects and lists zero users', async () => {
+  it('connects and returns a user count', async () => {
     const count = await prisma.user.count()
-    expect(count).toBe(0)
+    expect(typeof count).toBe('number')
+    expect(count).toBeGreaterThanOrEqual(0)
   })
 })

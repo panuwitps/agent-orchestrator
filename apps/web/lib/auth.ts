@@ -6,15 +6,21 @@ import { LoginInput } from '@ao/shared'
 import { prisma } from './prisma'
 import { resolveAuthMode } from './auth-mode'
 
+type AppRole = 'OWNER' | 'ADMIN' | 'MEMBER'
+
 declare module 'next-auth' {
   interface Session {
-    user: { id: string; role: 'OWNER' | 'ADMIN' | 'MEMBER' } & DefaultSession['user']
+    user: { id: string; role: AppRole } & DefaultSession['user']
   }
 }
 
+// JWT session strategy is required for Edge middleware: a database lookup
+// (PrismaAdapter.getSessionAndUser) cannot run in Next.js Edge runtime.
+// PrismaAdapter is still useful for OAuth account/user records when those
+// providers are added in team mode.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: 'database' },
+  session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
   providers: [
     Credentials({
@@ -38,9 +44,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    session: ({ session, user }) => ({
-      ...session,
-      user: { ...session.user, id: user.id, role: (user as any).role },
-    }),
+    jwt: ({ token, user }) => {
+      if (user) {
+        const u = user as { id?: string; role?: AppRole }
+        ;(token as Record<string, unknown>).id = u.id
+        ;(token as Record<string, unknown>).role = u.role
+      }
+      return token
+    },
+    session: ({ session, token }) => {
+      const t = token as { id?: string; role?: AppRole }
+      const sUser = session.user as { id: string; role: AppRole } & DefaultSession['user']
+      sUser.id = t.id ?? ''
+      sUser.role = t.role ?? 'MEMBER'
+      return session
+    },
   },
 })
