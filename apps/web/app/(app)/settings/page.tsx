@@ -1,8 +1,5 @@
-export default function Page() {
-  return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold capitalize">Settings</h1>
-      <p className="mt-2 text-sm opacity-70">Coming soon.</p>
-    </main>
-  )
+import { redirect } from 'next/navigation'
+
+export default function SettingsPage() {
+  redirect('/settings/providers')
 }
