@@ -21,6 +21,8 @@ export default defineConfig({
     include: ['**/integration/**/*.test.ts'],
     environment: 'node',
     pool: 'forks',
+    poolOptions: { forks: { singleFork: true } },
+    fileParallelism: false,
     testTimeout: 30_000,
     env,
   },
