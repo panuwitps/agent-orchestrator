@@ -303,7 +303,7 @@ Expected: exits with code 0, no error.
 - Create: `packages/db/tsconfig.json`
 - Create: `packages/db/prisma/schema.prisma`
 - Create: `packages/db/src/index.ts`
-- Create: `packages/db/tests/connection.test.ts`
+- Create: `packages/db/tests/integration/connection.test.ts`
 
 - [ ] **Step 1: Create `packages/db/package.json`**
 
@@ -482,11 +482,13 @@ psql -d agent_orchestrator -c '\dt'
 ```
 Expected: `users`, `accounts`, `sessions`, `verification_tokens`, `audit_logs`, `_prisma_migrations`.
 
-- [ ] **Step 7: Write failing connection test `packages/db/tests/connection.test.ts`**
+- [ ] **Step 7: Write integration connection test at `packages/db/tests/integration/connection.test.ts`**
+
+The `tests/integration/` subdir matters: vitest unit config excludes `**/integration/**`, and the integration config matches it. This keeps the unit suite pure (no DB dependency) while still letting the test run under `pnpm test:integration`.
 
 ```ts
 import { describe, it, expect, afterAll } from 'vitest'
-import { prisma } from '../src'
+import { prisma } from '../../src'
 
 describe('db connection', () => {
   afterAll(async () => {
@@ -500,13 +502,11 @@ describe('db connection', () => {
 })
 ```
 
-- [ ] **Step 8: Run test (expect fail until vitest is configured at root)**
+Note the import path is `../../src` (the file lives two levels deep: `tests/integration/`).
 
-Run:
-```bash
-pnpm test packages/db
-```
-Expected: `vitest` resolves no config yet — failure is OK; we'll wire in Task 14.
+- [ ] **Step 8: Defer running this test until Task 5 wires vitest configs**
+
+Don't run `pnpm test` here — Task 5 creates `vitest.config.ts` and `vitest.integration.config.ts` which both load `.env` via Vite's `loadEnv` so DB tests can resolve `DATABASE_URL`. Verify the file is well-formed by running `pnpm --filter @ao/db typecheck` — must pass.
 
 - [ ] **Step 9: Commit**
 
@@ -707,6 +707,9 @@ git commit -m "feat(shared): add AES-256-GCM crypto and zod validators"
 
 ```ts
 import { defineConfig } from 'vitest/config'
+import { loadEnv } from 'vite'
+
+const env = loadEnv('', process.cwd(), '')
 
 export default defineConfig({
   test: {
@@ -714,14 +717,20 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', '**/integration/**'],
     environment: 'node',
     globals: false,
+    env,
   },
 })
 ```
+
+> `loadEnv('', cwd, '')` reads root `.env` (and `.env.local`) and exposes the values to tests via `process.env`. Without this, integration tests that read `DATABASE_URL` fail.
 
 - [ ] **Step 2: Create `vitest.integration.config.ts`**
 
 ```ts
 import { defineConfig } from 'vitest/config'
+import { loadEnv } from 'vite'
+
+const env = loadEnv('', process.cwd(), '')
 
 export default defineConfig({
   test: {
@@ -729,17 +738,20 @@ export default defineConfig({
     environment: 'node',
     pool: 'forks',
     testTimeout: 30_000,
+    env,
   },
 })
 ```
 
-- [ ] **Step 3: Run all unit tests**
+- [ ] **Step 3: Run all unit + integration tests**
 
 Run:
 ```bash
-pnpm test
+pnpm test                # crypto: 4/4 pass
+pnpm test:integration    # db connection: 1/1 pass (DB seeded empty by Task 3)
 ```
-Expected: shared crypto tests pass; db connection test runs (passes if DB has zero users — should be true after fresh migrate).
+
+Expected: unit suite has 4 crypto tests pass and 0 db tests (excluded by `**/integration/**`). Integration suite has 1 db connection test pass.
 
 - [ ] **Step 4: Commit**
 
