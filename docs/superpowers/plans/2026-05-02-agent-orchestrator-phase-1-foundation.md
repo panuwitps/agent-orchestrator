@@ -202,8 +202,8 @@ AUTH_SECRET=                                     # openssl rand -base64 32
 AUTH_INVITE_ONLY=true
 AUTH_OAUTH_PROVIDERS=
 
-# DB
-DATABASE_URL=postgresql://localhost:5432/agent_orchestrator
+# DB — replace USER with your local Postgres role (default $USER on Postgres.app)
+DATABASE_URL=postgresql://USER@localhost:5432/agent_orchestrator
 
 # Crypto
 SECRET_KEY=                                      # openssl rand -base64 32
@@ -335,12 +335,13 @@ Expected: exits with code 0, no error.
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src"
+    "outDir": "dist"
   },
   "include": ["src/**/*", "tests/**/*"]
 }
 ```
+
+> Note: `rootDir` is intentionally omitted. Setting `rootDir: "src"` would conflict with the `tests/**/*` include glob and trigger TS6059 ("file is not under 'rootDir'").
 
 - [ ] **Step 3: Create `packages/db/prisma/schema.prisma`**
 
@@ -552,12 +553,13 @@ git commit -m "feat(db): add Prisma schema with User/Auth/AuditLog and singleton
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src"
+    "outDir": "dist"
   },
   "include": ["src/**/*", "tests/**/*"]
 }
 ```
+
+> Note: `rootDir` is intentionally omitted (same reason as `packages/db/tsconfig.json`).
 
 - [ ] **Step 3: Write failing crypto tests `packages/shared/tests/crypto.test.ts`**
 
