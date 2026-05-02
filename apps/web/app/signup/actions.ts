@@ -1,8 +1,8 @@
 'use server'
 
 import bcrypt from 'bcryptjs'
-import { prisma } from '../../lib/prisma'
-import { resolveAuthMode, isSignupAllowed } from '../../lib/auth-mode'
+import { prisma } from '@/lib/prisma'
+import { resolveAuthMode, isSignupAllowed } from '@/lib/auth-mode'
 import { SignupInput } from '@ao/shared'
 
 type Result = { ok: true; userId: string } | { ok: false; error: string }
@@ -17,7 +17,7 @@ export async function signupAction(raw: unknown): Promise<Result> {
   if (!isSignupAllowed(mode, existing)) {
     return { ok: false, error: 'Signup is disabled in this mode' }
   }
-  const hashed = await bcrypt.hash(parsed.data.password, 10)
+  const hashed = await bcrypt.hash(parsed.data.password, 12)
   const user = await prisma.user.create({
     data: {
       email: parsed.data.email,
