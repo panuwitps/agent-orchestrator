@@ -11,11 +11,13 @@ export function DataTable<T>({
   rows,
   columns,
   rowHref,
+  rowKey,
   emptyMessage = 'No items yet.',
 }: {
   rows: T[]
   columns: Column<T>[]
   rowHref?: (row: T) => Route
+  rowKey?: (row: T) => string | number
   emptyMessage?: string
 }) {
   if (rows.length === 0) {
@@ -38,22 +40,19 @@ export function DataTable<T>({
       </thead>
       <tbody>
         {rows.map((row, i) => {
-          const inner = columns.map((c, j) => (
-            <td key={j} className={`px-3 py-2 ${c.className ?? ''}`}>
-              {c.cell(row)}
-            </td>
-          ))
+          const key = rowKey ? rowKey(row) : i
           return (
-            <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-              {rowHref ? (
-                <td colSpan={columns.length} className="p-0">
-                  <Link href={rowHref(row)} className="block">
-                    <div className="flex">{inner}</div>
-                  </Link>
+            <tr key={key} className="relative border-b border-white/5 hover:bg-white/5">
+              {columns.map((c, j) => (
+                <td key={c.header} className={`px-3 py-2 ${c.className ?? ''}`}>
+                  {rowHref && j === 0 ? (
+                    <Link href={rowHref(row)} className="absolute inset-0" aria-label="Open">
+                      <span className="sr-only">Open</span>
+                    </Link>
+                  ) : null}
+                  <span className="relative">{c.cell(row)}</span>
                 </td>
-              ) : (
-                inner
-              )}
+              ))}
             </tr>
           )
         })}
