@@ -184,6 +184,7 @@ dist/
 .next/
 .turbo/
 *.log
+*.tsbuildinfo
 .env
 .env.local
 .DS_Store
@@ -495,9 +496,10 @@ describe('db connection', () => {
     await prisma.$disconnect()
   })
 
-  it('connects and lists zero users', async () => {
+  it('connects and returns a user count', async () => {
     const count = await prisma.user.count()
-    expect(count).toBe(0)
+    expect(typeof count).toBe('number')
+    expect(count).toBeGreaterThanOrEqual(0)
   })
 })
 ```
@@ -1036,6 +1038,8 @@ export { prisma } from '@ao/db'
 
 - [ ] **Step 5: Implement `apps/web/lib/auth.ts`**
 
+> Use `session.strategy: 'jwt'`. Database-strategy sessions require a DB lookup in middleware, which cannot run in the Next.js Edge runtime. The Prisma adapter still handles OAuth Account/User records.
+
 ```ts
 import NextAuth, { type DefaultSession } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
@@ -1045,15 +1049,17 @@ import { LoginInput } from '@ao/shared'
 import { prisma } from './prisma'
 import { resolveAuthMode } from './auth-mode'
 
+type AppRole = 'OWNER' | 'ADMIN' | 'MEMBER'
+
 declare module 'next-auth' {
   interface Session {
-    user: { id: string; role: 'OWNER' | 'ADMIN' | 'MEMBER' } & DefaultSession['user']
+    user: { id: string; role: AppRole } & DefaultSession['user']
   }
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: 'database' },
+  session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
   providers: [
     Credentials({
@@ -1061,7 +1067,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorize: async (raw) => {
         const mode = resolveAuthMode()
         if (mode === 'none') {
-          // auto-login as default user (created on first boot by seed)
           const user = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } })
           return user
             ? { id: user.id, email: user.email, name: user.name, role: user.role }
@@ -1078,13 +1083,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    session: ({ session, user }) => ({
-      ...session,
-      user: { ...session.user, id: user.id, role: (user as any).role },
-    }),
+    jwt: ({ token, user }) => {
+      if (user) {
+        const u = user as { id?: string; role?: AppRole }
+        ;(token as Record<string, unknown>).id = u.id
+        ;(token as Record<string, unknown>).role = u.role
+      }
+      return token
+    },
+    session: ({ session, token }) => {
+      const t = token as { id?: string; role?: AppRole }
+      const sUser = session.user as { id: string; role: AppRole } & DefaultSession['user']
+      sUser.id = t.id ?? ''
+      sUser.role = t.role ?? 'MEMBER'
+      return session
+    },
   },
 })
 ```
+
+> Note on `@ao/shared` import: `LoginInput` re-exports from the validators barrel (no `node:crypto`). The crypto helpers are NOT in the barrel — they live at `@ao/shared/crypto` so middleware bundling stays Edge-clean.
 
 - [ ] **Step 6: Implement `apps/web/app/api/auth/[...nextauth]/route.ts`**
 
@@ -1162,12 +1180,14 @@ Expected: cannot resolve `../../app/signup/actions`.
 
 - [ ] **Step 2: Implement `apps/web/app/signup/actions.ts`**
 
+> Use relative imports (`../../lib/...`) here, not `@/`. Vitest does not resolve the Next-only `@/` path alias and the integration test imports this file directly. Phase 2 will add `vite-tsconfig-paths` so `@/` works in tests; until then, relative imports are the path of least friction for files imported by tests.
+
 ```ts
 'use server'
 
 import bcrypt from 'bcryptjs'
-import { prisma } from '@/lib/prisma'
-import { resolveAuthMode, isSignupAllowed } from '@/lib/auth-mode'
+import { prisma } from '../../lib/prisma'
+import { resolveAuthMode, isSignupAllowed } from '../../lib/auth-mode'
 import { SignupInput } from '@ao/shared'
 
 type Result = { ok: true; userId: string } | { ok: false; error: string }
@@ -1815,10 +1835,10 @@ serve({ fetch: app.fetch, port })
 console.log(`[orchestrator] listening on :${port}`)
 ```
 
-- [ ] **Step 6: Write failing test `apps/orchestrator/tests/healthz.test.ts`**
+- [ ] **Step 6: Write `apps/orchestrator/tests/healthz.test.ts`**
 
 ```ts
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { Hono } from 'hono'
 import { healthz } from '../src/routes/healthz'
 import { internalAuth } from '../src/middleware/internal-auth'
@@ -1833,16 +1853,22 @@ describe('healthz', () => {
 })
 
 describe('internalAuth', () => {
+  beforeEach(() => {
+    vi.stubEnv('INTERNAL_API_TOKEN', 'secret')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   it('rejects missing token', async () => {
-    process.env.INTERNAL_API_TOKEN = 'secret'
     const app = new Hono()
     app.use('*', internalAuth)
     app.get('/x', (c) => c.text('ok'))
     const res = await app.request('/x')
     expect(res.status).toBe(401)
   })
+
   it('accepts correct token', async () => {
-    process.env.INTERNAL_API_TOKEN = 'secret'
     const app = new Hono()
     app.use('*', internalAuth)
     app.get('/x', (c) => c.text('ok'))

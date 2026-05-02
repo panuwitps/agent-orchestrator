@@ -6,9 +6,10 @@ describe('auth-mode', () => {
     vi.unstubAllEnvs()
   })
 
-  it('defaults to local when env unset', () => {
-    // AUTH_MODE=local in .env, which is the expected default
-    vi.stubEnv('AUTH_MODE', 'local')
+  it('defaults to local when env is unset', () => {
+    // Actually exercise the `?? 'local'` fallback by removing AUTH_MODE.
+    // vi.stubEnv accepts undefined to unset a key (falls through to delete).
+    vi.stubEnv('AUTH_MODE', undefined as unknown as string)
     expect(resolveAuthMode()).toBe('local')
   })
 
