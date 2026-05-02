@@ -1714,10 +1714,10 @@ git commit -m "feat(web): Cmd+K command palette with route navigation"
   "name": "@ao/orchestrator",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "start": "tsx src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo 'no lint configured'"
   },
@@ -1728,10 +1728,13 @@ git commit -m "feat(web): Cmd+K command palette with route navigation"
     "hono": "^4.6.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "tsx": "^4.16.0"
   }
 }
 ```
+
+> **Note:** We run TypeScript directly via `tsx` for both dev and start (no compiled `dist/`). This avoids ESM emit pitfalls (missing `.js` extensions under `module: NodeNext`) and keeps the orchestrator simple to deploy. We can add a real build step later if production demands compiled output.
 
 - [ ] **Step 2: Create `apps/orchestrator/tsconfig.json`**
 
@@ -1739,9 +1742,8 @@ git commit -m "feat(web): Cmd+K command palette with route navigation"
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
-    "module": "ESNext"
+    "noEmit": true,
+    "rootDir": "src"
   },
   "include": ["src/**/*", "tests/**/*"]
 }
