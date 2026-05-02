@@ -5,8 +5,8 @@ See [docs/superpowers/specs/2026-05-02-agent-orchestrator-design.md](docs/superp
 
 ## Phase status
 
-- [x] Phase 1 — Foundation (this commit)
-- [ ] Phase 2 — Catalog CRUD (Personas, Roles, Skills, Plugins, MCP, Projects, Components)
+- [x] Phase 1 — Foundation
+- [x] Phase 2 — Catalog CRUD (Personas, Roles, Skills, Plugins, MCP, Projects, Components)
 - [ ] Phase 3 — Single-agent dispatch
 - [ ] Phase 4 — Rich chat UX (slash commands, file refs, attachments, autonomous mode)
 - [ ] Phase 5 — Universal MCP Gateway
