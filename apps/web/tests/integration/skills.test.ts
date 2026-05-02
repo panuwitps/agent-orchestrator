@@ -70,4 +70,42 @@ describe('skills CRUD', () => {
     expect(del.ok).toBe(true)
     expect(await listSkillsForOwner(u.id)).toHaveLength(0)
   })
+
+  it('rejects renaming a skill to an existing name', async () => {
+    const u = await makeOwner()
+    const a = await createSkillAction(u.id, {
+      name: 'a', description: '', content: 'x', frontmatter: {}, compatibleProviders: [],
+    })
+    const b = await createSkillAction(u.id, {
+      name: 'b', description: '', content: 'y', frontmatter: {}, compatibleProviders: [],
+    })
+    expect(a.ok).toBe(true)
+    expect(b.ok).toBe(true)
+    if (!b.ok) return
+    const res = await updateSkillAction(u.id, b.data.id, {
+      name: 'a', description: '', content: 'y', frontmatter: {}, compatibleProviders: [],
+    })
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.error.toLowerCase()).toContain('already exists')
+  })
+
+  it('cannot read or mutate a skill owned by another user', async () => {
+    const owner = await makeOwner()
+    const attacker = await prisma.user.create({
+      data: { email: `atk+${Date.now()}@t.com`, role: 'OWNER' },
+    })
+    const created = await createSkillAction(owner.id, {
+      name: 'secret', description: '', content: 'x', frontmatter: {}, compatibleProviders: [],
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    const upd = await updateSkillAction(attacker.id, created.data.id, {
+      name: 'stolen', description: '', content: 'x', frontmatter: {}, compatibleProviders: [],
+    })
+    expect(upd.ok).toBe(false)
+    if (!upd.ok) expect(upd.error.toLowerCase()).toContain('not found')
+    const del = await deleteSkillAction(attacker.id, created.data.id)
+    expect(del.ok).toBe(false)
+    expect(await listSkillsForOwner(owner.id)).toHaveLength(1)
+  })
 })

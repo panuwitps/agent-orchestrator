@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { FormField, TextArea } from '@/components/form-field'
+import { tryJson, parseCsv } from '@/lib/form-utils'
 import { createSkillAction } from '../actions'
 
 export default function NewSkillPage() {
@@ -38,22 +39,4 @@ export default function NewSkillPage() {
       </form>
     </main>
   )
-}
-
-function tryJson(v: FormDataEntryValue | null): Record<string, unknown> {
-  if (typeof v !== 'string' || v.trim() === '') return {}
-  try {
-    const parsed = JSON.parse(v)
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function parseCsv(v: FormDataEntryValue | null): string[] {
-  if (typeof v !== 'string') return []
-  return v
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
 }
