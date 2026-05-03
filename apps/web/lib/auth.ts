@@ -28,10 +28,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorize: async (raw) => {
         const mode = resolveAuthMode()
         if (mode === 'none') {
-          const user = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } })
-          return user
-            ? { id: user.id, email: user.email, name: user.name, role: user.role }
-            : null
+          const user = await prisma.user.upsert({
+            where:  { email: 'owner@local' },
+            update: {},
+            create: { email: 'owner@local', name: 'Default Owner', role: 'OWNER' },
+          })
+          return { id: user.id, email: user.email, name: user.name, role: user.role }
         }
         const parsed = LoginInput.safeParse(raw)
         if (!parsed.success) return null
